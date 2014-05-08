@@ -1,7 +1,7 @@
 // Display how the compiler resolved lookup and overload of specific function
 //
 //  Usage:
-//  show-call-template <cmake-output-dir> <file1> <file2> ...
+//  show-call <cmake-output-dir> <file1> <file2> ...
 //
 //  Where <cmake-output-dir> is a CMake build directory in which a file named
 //  compile_commands.json exists (enable -DCMAKE_EXPORT_COMPILE_COMMANDS in
@@ -20,7 +20,7 @@
 //  source tree, use:
 //
 //    /path/in/subtree $ find . -name '*.cpp'|
-//        xargs tool-template /path/to/build
+//        xargs show-call /path/to/build
 //
 //===----------------------------------------------------------------------===//
 
