@@ -80,12 +80,12 @@ void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr 
   errs() << "Call site:\n";
   call->dump();
 
-  errs() << "\nCalled function: ";
+  errs() << "\nCallee:\n";
   const FunctionDecl *FD = cast<FunctionDecl>(call->getCalleeDecl());
   FD->printQualifiedName(errs());
 
   SplitQualType T_split = FD->getType().split();
-  errs() << ' ' << QualType::getAsString(T_split);
+  errs() << " with prototype \"" << QualType::getAsString(T_split) << '"';
 
   if (FD->isDefaulted()) {
     errs() << " (defaulted)\n";
