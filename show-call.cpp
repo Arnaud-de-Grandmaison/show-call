@@ -58,23 +58,39 @@ cl::opt<unsigned> CallAtLine(
   cl::init(0));
 
 namespace {
-void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr *call) {
-
-  const SourceLocation Loc = call->getLocStart();
+void getSourceInfo(const SourceManager &SM, const SourceLocation &Loc,
+                   StringRef &filename, unsigned &line, unsigned &col) {
   std::pair<FileID, unsigned> LocInfo = SM.getDecomposedLoc(Loc);
   FileID FID = LocInfo.first;
   unsigned FileOffset = LocInfo.second;
+  filename = SM.getFilename(Loc);
+  line = SM.getLineNumber(FID, FileOffset);
+  col = SM.getColumnNumber(FID, FileOffset);
+}
 
-  unsigned LineNumber = SM.getLineNumber(FID, FileOffset);
+void getSourceInfo(const SourceManager &SM, const SourceLocation &Loc,
+                   StringRef &filename, unsigned &line) {
+  std::pair<FileID, unsigned> LocInfo = SM.getDecomposedLoc(Loc);
+  FileID FID = LocInfo.first;
+  unsigned FileOffset = LocInfo.second;
+  filename = SM.getFilename(Loc);
+  line = SM.getLineNumber(FID, FileOffset);
+}
 
-  if (LineNumber != CallAtLine && CallAtLine != 0)
+void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr *call) {
+
+  StringRef FileName;
+  unsigned LineNum, ColNum;
+  getSourceInfo(SM, call->getLocStart(), FileName, LineNum, ColNum);
+
+  if (LineNum != CallAtLine && CallAtLine != 0)
     return;
 
   errs() << "\n=================================\n"
          << CallKind << " call"
-         << " (File:" << SM.getFilename(Loc)
-         << " Line:" << LineNumber
-         << " Col:" << SM.getColumnNumber(FID, FileOffset) << ")"
+         << " (File:" << FileName
+         << " Line:" << LineNum
+         << " Col:" << ColNum << ")"
          << "\n---------------------------------\n";
 
   errs() << "Call site:\n";
@@ -90,12 +106,10 @@ void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr 
   if (FD->isDefaulted()) {
     errs() << " (defaulted)\n";
   } else {
-    const SourceLocation DLoc = FD->getLocStart();
-    std::pair<FileID, unsigned> DLocInfo = SM.getDecomposedLoc(DLoc);
-    FileID DFID = DLocInfo.first;
-    unsigned DFileOffset = DLocInfo.second;
-    errs() << " declared at " << SM.getFilename(DLoc) << ':'
-           << SM.getLineNumber(DFID, DFileOffset) << '\n';
+    StringRef DeclFileName;
+    unsigned DeclLineNum;
+    getSourceInfo(SM, FD->getLocStart(), DeclFileName, DeclLineNum);
+    errs() << " declared at " << DeclFileName << ':' << DeclLineNum << '\n';
   }
 }
 
