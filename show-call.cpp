@@ -80,8 +80,23 @@ void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr 
   errs() << "Call site:\n";
   call->dump();
 
-  errs() << "\nCalled function:\n";
-  call->getCalleeDecl()->dump();
+  errs() << "\nCalled function: ";
+  const FunctionDecl *FD = cast<FunctionDecl>(call->getCalleeDecl());
+  FD->printQualifiedName(errs());
+
+  SplitQualType T_split = FD->getType().split();
+  errs() << ' ' << QualType::getAsString(T_split);
+
+  if (FD->isDefaulted()) {
+    errs() << " (defaulted)\n";
+  } else {
+    const SourceLocation DLoc = FD->getLocStart();
+    std::pair<FileID, unsigned> DLocInfo = SM.getDecomposedLoc(DLoc);
+    FileID DFID = DLocInfo.first;
+    unsigned DFileOffset = DLocInfo.second;
+    errs() << " declared at " << SM.getFilename(DLoc) << ':'
+           << SM.getLineNumber(DFID, DFileOffset) << '\n';
+  }
 }
 
 class SCCallBack : public MatchFinder::MatchCallback {
