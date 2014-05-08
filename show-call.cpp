@@ -52,6 +52,11 @@ cl::list<std::string> SourcePaths(
   cl::desc("<source0> [... <sourceN>]"),
   cl::OneOrMore);
 
+cl::opt<unsigned> CallAtLine(
+  "call-at-line",
+  cl::desc("Only display call(s) at this line"),
+  cl::init(0));
+
 namespace {
 void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr *call) {
 
@@ -60,10 +65,15 @@ void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr 
   FileID FID = LocInfo.first;
   unsigned FileOffset = LocInfo.second;
 
+  unsigned LineNumber = SM.getLineNumber(FID, FileOffset);
+
+  if (LineNumber != CallAtLine && CallAtLine != 0)
+    return;
+
   errs() << "\n=================================\n"
          << CallKind << " call"
          << " (File:" << SM.getFilename(Loc)
-         << " Line:" << SM.getLineNumber(FID, FileOffset)
+         << " Line:" << LineNumber
          << " Col:" << SM.getColumnNumber(FID, FileOffset) << ")"
          << "\n---------------------------------\n";
 
