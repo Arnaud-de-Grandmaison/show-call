@@ -70,4 +70,4 @@ A lot !
 License
 =======
 
-See file `LICENSE`.
+See file `LICENSE` at the top-level directory of this project.
