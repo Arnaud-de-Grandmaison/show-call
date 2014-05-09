@@ -28,7 +28,7 @@ The first step is to drop the `show-call` source code in the source tree:
    % cd llvm.git/tools/clang/tools/extra
    % tar xfz show-call.tar.gz
 
-...The second step is to add it to the build system. For the `cmake` case, this
+The second step is to add it to the build system. For the `cmake` case, this
 would look like:
 
 .. code-block:: console
@@ -37,7 +37,7 @@ would look like:
    % vi CMakeLists.txt
    ... add add_subdirectory(show-call)
 
-...Et voilà ! Now a simple `make` or `ninja` in your build directory should
+Et voilà ! Now a simple `make` or `ninja` in your build directory should
 build `show-call`.
 
 Usage
