@@ -24,6 +24,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/ASTContext.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Basic/Diagnostic.h"
@@ -36,6 +37,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Signals.h"
+
+#include <sstream>
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -67,6 +70,11 @@ cl::opt<bool> ShowCalleeAST(
   cl::desc("Display the callee declaration AST"),
   cl::init(false));
 
+cl::opt<bool> Annotate(
+  "annotate",
+  cl::desc("Annotate the source code"),
+  cl::init(false));
+
 namespace {
 void getSourceInfo(const SourceManager &SM, const SourceLocation &Loc,
                    StringRef &filename, unsigned &line, unsigned &col) {
@@ -87,53 +95,13 @@ void getSourceInfo(const SourceManager &SM, const SourceLocation &Loc,
   line = SM.getLineNumber(FID, FileOffset);
 }
 
-void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr *call) {
-
-  StringRef FileName;
-  unsigned LineNum, ColNum;
-  getSourceInfo(SM, call->getLocStart(), FileName, LineNum, ColNum);
-
-  if (LineNum != CallAtLine && CallAtLine != 0)
-    return;
-
-  errs() << "\n=================================\n"
-         << CallKind << " call"
-         << " (File:" << FileName
-         << " Line:" << LineNum
-         << " Col:" << ColNum << ")"
-         << "\n---------------------------------\n";
-
-  if (ShowCallAST) {
-    errs() << "Call site:\n";
-    call->dump();
-  }
-
-  errs() << "\nCallee:\n";
-  const FunctionDecl *FD = cast<FunctionDecl>(call->getCalleeDecl());
-  if (ShowCalleeAST) {
-    FD->dump();
-  }
-  FD->printQualifiedName(errs());
-
-  SplitQualType T_split = FD->getType().split();
-  errs() << " with prototype \"" << QualType::getAsString(T_split) << '"';
-
-  if (FD->isDefaulted()) {
-    errs() << " (defaulted)\n";
-  } else {
-    StringRef DeclFileName;
-    unsigned DeclLineNum;
-    getSourceInfo(SM, FD->getLocStart(), DeclFileName, DeclLineNum);
-    errs() << " declared at " << DeclFileName << ':' << DeclLineNum << '\n';
-  }
-}
-
 class SCCallBack : public MatchFinder::MatchCallback {
 public:
-  SCCallBack(Replacements *Replace) : Replace(Replace) { }
+  SCCallBack(Replacements &Replace) : Replace(Replace) { }
 
   virtual void run(const MatchFinder::MatchResult &Result) {
-    SourceManager &SM = *Result.SourceManager;
+    const SourceManager &SM = *Result.SourceManager;
+    const LangOptions &LangOpts = Result.Context->getLangOpts();
 
     if (const CallExpr *call =
             Result.Nodes.getNodeAs<CallExpr>("call")) {
@@ -145,7 +113,7 @@ public:
       else if (isa<CXXOperatorCallExpr>(call))
         callKind = "Operator";
 
-      dumpCallInfo(callKind, SM, call);
+      dumpCallInfo(callKind, SM, call, LangOpts);
 
       return;
     }
@@ -153,12 +121,65 @@ public:
     assert(false && "Unhandled match !");
   }
 
-  void dummy() {
-    (void)Replace; // This to prevent an "unused member variable" warning;
+private:
+  Replacements &Replace;
+
+  void dumpCallInfo(const char *CallKind, const SourceManager &SM,
+                    const CallExpr *call, const LangOptions &LangOpts) {
+
+    StringRef FileName;
+    unsigned LineNum, ColNum;
+    getSourceInfo(SM, call->getLocStart(), FileName, LineNum, ColNum);
+
+    if (LineNum != CallAtLine && CallAtLine != 0)
+      return;
+
+    errs() << "Call site: "
+           << Lexer::getSourceText(
+                  CharSourceRange::getTokenRange(call->getSourceRange()), SM,
+                  LangOpts)
+           << '\n';
+
+    if (ShowCallAST)
+      call->dump();
+
+    errs() << "Callee: ";
+    const FunctionDecl *CalleeDecl = cast<FunctionDecl>(call->getCalleeDecl());
+
+    SplitQualType T_split = CalleeDecl->getType().split();
+    std::ostringstream s;
+
+    if (!CalleeDecl->isDefaulted()) {
+      StringRef DeclFileName;
+      unsigned DeclLineNum;
+      getSourceInfo(SM, CalleeDecl->getLocStart(), DeclFileName, DeclLineNum);
+
+      SplitQualType T_split = CalleeDecl->getType().split();
+      s << CalleeDecl->getQualifiedNameAsString()
+        << ' ' << QualType::getAsString(T_split)
+        << " @ " << DeclFileName.str() << ":" << DeclLineNum;
+    } else
+      s << "(defaulted) " << QualType::getAsString(T_split);
+
+    errs() << s.str() << '\n';
+
+    if (Annotate) {
+      char c = *FullSourceLoc(call->getLocEnd(), SM).getCharacterData();
+      std::string annotation(1, c);
+      annotation += " /* ";
+      annotation += s.str();
+      annotation += " */";
+      CharSourceRange InsertPt = CharSourceRange::getTokenRange(
+          call->getLocEnd(), call->getLocEnd());
+      Replace.insert(Replacement(SM, InsertPt, annotation));
+    }
+
+    if (ShowCalleeAST)
+      CalleeDecl->dump();
+
+    errs() << '\n';
   }
 
-private:
-  Replacements *Replace;
 };
 } // end anonymous namespace
 
@@ -185,7 +206,7 @@ int main(int argc, const char **argv) {
 
   RefactoringTool Tool(*Compilations, SourcePaths);
   ast_matchers::MatchFinder Finder;
-  SCCallBack Callback(&Tool.getReplacements());
+  SCCallBack Callback(Tool.getReplacements());
 
   Finder.addMatcher(callExpr().bind("call"), &Callback);
   //Finder.addMatcher(
@@ -196,5 +217,6 @@ int main(int argc, const char **argv) {
   //                   callee(methodDecl(hasName("f")))).bind("call"),
   //    &Callback);
 
-  return Tool.run(newFrontendActionFactory(&Finder).get());
+  return Annotate ? Tool.runAndSave(newFrontendActionFactory(&Finder).get())
+                  : Tool.run(newFrontendActionFactory(&Finder).get());
 }
