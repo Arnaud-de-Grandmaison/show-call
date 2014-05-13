@@ -61,6 +61,12 @@ cl::opt<bool> ShowCallAST(
   "show-call-ast",
   cl::desc("Display the AST at the call location"),
   cl::init(false));
+
+cl::opt<bool> ShowCalleeAST(
+  "show-callee-ast",
+  cl::desc("Display the callee declaration AST"),
+  cl::init(false));
+
 namespace {
 void getSourceInfo(const SourceManager &SM, const SourceLocation &Loc,
                    StringRef &filename, unsigned &line, unsigned &col) {
@@ -104,6 +110,9 @@ void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr 
 
   errs() << "\nCallee:\n";
   const FunctionDecl *FD = cast<FunctionDecl>(call->getCalleeDecl());
+  if (ShowCalleeAST) {
+    FD->dump();
+  }
   FD->printQualifiedName(errs());
 
   SplitQualType T_split = FD->getType().split();
