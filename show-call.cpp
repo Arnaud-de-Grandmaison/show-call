@@ -57,6 +57,10 @@ cl::opt<unsigned> CallAtLine(
   cl::desc("Only display call(s) at this line"),
   cl::init(0));
 
+cl::opt<bool> ShowCallAST(
+  "show-call-ast",
+  cl::desc("Display the AST at the call location"),
+  cl::init(false));
 namespace {
 void getSourceInfo(const SourceManager &SM, const SourceLocation &Loc,
                    StringRef &filename, unsigned &line, unsigned &col) {
@@ -93,8 +97,10 @@ void dumpCallInfo(const char *CallKind, const SourceManager &SM, const CallExpr 
          << " Col:" << ColNum << ")"
          << "\n---------------------------------\n";
 
-  errs() << "Call site:\n";
-  call->dump();
+  if (ShowCallAST) {
+    errs() << "Call site:\n";
+    call->dump();
+  }
 
   errs() << "\nCallee:\n";
   const FunctionDecl *FD = cast<FunctionDecl>(call->getCalleeDecl());
