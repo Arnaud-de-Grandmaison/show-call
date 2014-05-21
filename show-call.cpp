@@ -60,6 +60,11 @@ cl::opt<unsigned> CallAtLine(
   cl::desc("Only display call(s) at this line"),
   cl::init(0));
 
+cl::opt<std::string> CalleeName(
+  "callee-name",
+  cl::desc("Only display call(s) to this callee"),
+  cl::init(""));
+
 cl::opt<bool> ShowCallAST(
   "show-call-ast",
   cl::desc("Display the AST at the call location"),
@@ -209,10 +214,12 @@ int main(int argc, const char **argv) {
   ast_matchers::MatchFinder Finder;
   SCCallBack Callback(Tool.getReplacements());
 
-  Finder.addMatcher(callExpr().bind("call"), &Callback);
-  //Finder.addMatcher(
-  //    callExpr(callee(methodDecl(hasName("operator=")))).bind("call"),
-  //    &Callback);
+  if (CalleeName != "")
+    Finder.addMatcher(
+        callExpr(callee(functionDecl(hasName(CalleeName)))).bind("call"),
+        &Callback);
+  else
+    Finder.addMatcher(callExpr().bind("call"), &Callback);
   //Finder.addMatcher(
   //    memberCallExpr(on(hasType(asString("N::C *"))),
   //                   callee(methodDecl(hasName("f")))).bind("call"),
