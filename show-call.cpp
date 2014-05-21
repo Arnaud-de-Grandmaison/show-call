@@ -138,6 +138,7 @@ private:
            << Lexer::getSourceText(
                   CharSourceRange::getTokenRange(call->getSourceRange()), SM,
                   LangOpts)
+           << " @ " << FileName << ':' << LineNum
            << '\n';
 
     if (ShowCallAST)
@@ -157,7 +158,7 @@ private:
       SplitQualType T_split = CalleeDecl->getType().split();
       s << CalleeDecl->getQualifiedNameAsString()
         << ' ' << QualType::getAsString(T_split)
-        << " @ " << DeclFileName.str() << ":" << DeclLineNum;
+        << " @ " << DeclFileName.str() << ':' << DeclLineNum;
     } else
       s << "(defaulted) " << QualType::getAsString(T_split);
 
